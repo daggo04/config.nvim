@@ -1,0 +1,18 @@
+-- Define the function in the global scope so VimScript can access it
+-- _G.term_here_cmd = function()
+--   local path = vim.fn.expand '%:p:h'
+--   local shell = vim.o.shell
+--   return shell .. ' -c "cd ' .. path .. ' && exec ' .. shell .. '"'
+-- end
+--
+-- -- Create a command abbreviation that expands when you press Enter
+-- vim.cmd [[
+--   function! ExpandTermHere()
+--     let cmd = 'terminal ' .. luaeval('_G.term_here_cmd()')
+--     call feedkeys(':' .. cmd .. "\<CR>")
+--     return ''
+--   endfunction
+--
+--   cabbrev <expr> termhere ExpandTermHere()
+-- ]]
+-- Note: Does Not Work!
