@@ -364,7 +364,7 @@ require('lazy').setup({
       vim.keymap.set('n', '<leader>sa', function()
         require('telescope.builtin').find_files {
           prompt_title = 'Find Files Anywhere',
-          cwd = '/', -- Change this to any directory you frequently search
+          cwd = '~/', -- Change this to any directory you frequently search
         }
       end, { desc = '[s]earch [a]nywhere' })
     end,
@@ -582,7 +582,17 @@ require('lazy').setup({
       local servers = {
         -- clangd = {},
         -- gopls = {},
-        -- pyright = {},
+        pyright = {
+          settings = {
+            python = {
+              analysis = {
+                autoSearchPaths = true,
+                useLibraryCodeForTypes = true,
+                diagnosticMode = 'workspace',
+              },
+            },
+          },
+        },
         -- rust_analyzer = {},
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
         --
