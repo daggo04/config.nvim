@@ -24,6 +24,7 @@ return {
     -- Track notifications to avoid spam
     local linter_status_notified = {}
     local last_detected_env = nil
+    local last_callback_time = 0
 
     -- =============================================================================
     -- ENVIRONMENT DETECTION CHAIN
@@ -148,19 +149,41 @@ return {
       -- Handle detection results
       if detected_python then
         -- Only switch if we detected something different
-        local current_python = require('venv-selector').python()
+        local current_python = M.get_active_python()
         if current_python ~= detected_python then
-          -- Set the detected environment
-          require('venv-selector').set_venv_and_system_python(detected_python)
+          -- First, let's debug what venv-selector thinks about our path
+          local venv_path = vim.fn.fnamemodify(detected_python, ':h:h')
 
-          -- Show success notification
-          mini_notifier('Auto-detected Python environment: ' .. detection_source, vim.log.levels.INFO)
+          mini_notifier('Trying to activate: ' .. venv_path, vim.log.levels.INFO)
 
-          -- Configure linting and LSP for the new environment
+          -- Try the venv-selector API first
+          local venv_selector = require 'venv-selector'
+          local success, error_msg = pcall(venv_selector.activate_from_path, venv_path)
+
+          -- Check if activation actually worked
+          local new_python = require('venv-selector').python()
+
+          if success and new_python and new_python == detected_python then
+            -- venv-selector worked correctly
+            manually_detected_python = nil -- Clear manual override
+            mini_notifier('Auto-detected Python environment: ' .. detection_source, vim.log.levels.INFO)
+          else
+            -- venv-selector didn't work, use manual override
+            manually_detected_python = detected_python
+            mini_notifier('venv-selector failed, using manual override for: ' .. detection_source, vim.log.levels.WARN)
+          end
+
+          -- Reset LSP tracking to allow reconfiguration
+          lsp_configured_for_python = nil
+
+          -- Configure linting and LSP with the new environment
           M.configure_python_linting()
           M.configure_python_lsp()
 
           last_detected_env = detected_python
+        else
+          -- Already using the detected environment
+          mini_notifier('Already using detected environment: ' .. detection_source, vim.log.levels.INFO)
         end
       else
         -- No environment detected, check if we had one before
@@ -177,13 +200,13 @@ return {
     -- =============================================================================
 
     function M.configure_python_linting()
-      local venv_python = require('venv-selector').python()
+      local venv_python = M.get_active_python()
       local buffer_path = vim.api.nvim_buf_get_name(0)
 
       -- Handle case when no venv is activated
       if not venv_python then
-        -- Use basic linters that don't require venv
-        require('lint').linters_by_ft.python = { 'pylint' }
+        -- Disable linting when no venv is active
+        require('lint').linters_by_ft.python = {}
         return false
       end
 
@@ -217,10 +240,24 @@ return {
 
       -- Configure linting based on available linters
       if #available_linters > 0 then
+        -- Use the best available linter
         require('lint').linters_by_ft.python = { available_linters[1] }
+
+        local linter_list = table.concat(available_linters, ', ')
+        local status_key = 'linters_' .. table.concat(available_linters, '_')
+
+        if not linter_status_notified[buffer_path] or linter_status_notified[buffer_path] ~= status_key then
+          mini_notifier(string.format('Python linters detected: %s. Using %s for linting.', linter_list, available_linters[1]), vim.log.levels.INFO)
+          linter_status_notified[buffer_path] = status_key
+        end
       else
-        -- Fall back to basic linting
-        require('lint').linters_by_ft.python = { 'pylint' }
+        -- No linters found - disable linting entirely (no errors)
+        require('lint').linters_by_ft.python = {}
+
+        if not linter_status_notified[buffer_path] or linter_status_notified[buffer_path] ~= 'no_linters' then
+          mini_notifier('No Python linters in this environment. Linting disabled. (LSP still active for code intelligence)', vim.log.levels.INFO)
+          linter_status_notified[buffer_path] = 'no_linters'
+        end
       end
 
       return #available_linters > 0
@@ -230,25 +267,64 @@ return {
     -- LSP CONFIGURATION
     -- =============================================================================
 
+    -- Track the manually detected environment (bypass venv-selector if needed)
+    local manually_detected_python = nil
+    -- Track LSP configuration to prevent loops
+    local lsp_configured_for_python = nil
+
+    -- Modified python getter that includes our manual detection
+    function M.get_active_python()
+      return manually_detected_python or require('venv-selector').python()
+    end
+
     function M.configure_python_lsp()
-      local venv_python = require('venv-selector').python()
+      local venv_python = M.get_active_python()
 
-      if venv_python then
-        -- Update pyright to use the selected Python interpreter
+      if not venv_python then
+        return
+      end
+
+      -- Prevent infinite loops - only reconfigure if python path actually changed
+      if lsp_configured_for_python == venv_python then
+        return
+      end
+
+      lsp_configured_for_python = venv_python
+
+      -- Update existing pyright clients instead of creating new ones
+      local clients = vim.lsp.get_clients { name = 'pyright' }
+
+      if #clients > 0 then
+        -- Update existing client settings
+        for _, client in ipairs(clients) do
+          if client.config.settings and client.config.settings.python then
+            client.config.settings.python.pythonPath = venv_python
+            -- Notify the client of the settings change
+            client.notify('workspace/didChangeConfiguration', {
+              settings = client.config.settings,
+            })
+          end
+        end
+      else
+        -- No existing client, configure LSP normally
         local lspconfig = require 'lspconfig'
-
-        -- Restart pyright with new Python path
         lspconfig.pyright.setup {
+          root_dir = require('lspconfig.util').root_pattern('.git', 'pyproject.toml', 'setup.py', '.python-version'),
           settings = {
             python = {
               pythonPath = venv_python,
+              analysis = {
+                autoSearchPaths = true,
+                useLibraryCodeForTypes = true,
+                diagnosticMode = 'workspace',
+              },
             },
           },
         }
 
-        -- Restart the LSP for current buffer if it's a Python file
+        -- Only start LSP if we're in a Python file and no client is attached
         if vim.bo.filetype == 'python' then
-          vim.cmd 'LspRestart pyright'
+          vim.cmd 'LspStart pyright'
         end
       end
     end
@@ -276,6 +352,13 @@ return {
 
           -- Configure both linting AND LSP after venv activation
           on_venv_activate_callback = function()
+            -- Throttle callback to prevent rapid-fire execution
+            local current_time = vim.loop.hrtime()
+            if current_time - last_callback_time < 1000000000 then -- 1 second in nanoseconds
+              return
+            end
+            last_callback_time = current_time
+
             M.configure_python_linting()
             M.configure_python_lsp()
           end,
@@ -326,6 +409,15 @@ return {
         _G.venv_utils.auto_detect_environment()
       end,
       desc = 'Auto-detect Python Venv',
+    },
+    {
+      '<leader>vp',
+      function()
+        local python = _G.venv_utils.get_active_python()
+        print('Active Python: ' .. tostring(python))
+        require('mini.notify').make_notify()('Active Python: ' .. tostring(python), vim.log.levels.INFO)
+      end,
+      desc = 'Show active Python path',
     },
   },
 }
