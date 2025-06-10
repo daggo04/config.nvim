@@ -598,7 +598,7 @@ require('lazy').setup({
         --    https://github.com/pmizio/typescript-tools.nvim
         --
         -- But for many setups, the LSP (`ts_ls`) will work just fine
-        -- ts_ls = {},
+        ts_ls = {},
         --
 
         lua_ls = {
@@ -699,7 +699,10 @@ require('lazy').setup({
         -- python = { "isort", "black" },
         --
         -- You can use 'stop_after_first' to run the first available formatter from the list
-        -- javascript = { "prettierd", "prettier", stop_after_first = true },
+        javascript = { "prettierd", "prettier", stop_after_first = true },
+        typescript = { "prettierd", "prettier", stop_after_first = true },
+        javascriptreact = { "prettierd", "prettier", stop_after_first = true },
+        typescriptreact = { "prettierd", "prettier", stop_after_first = true },
       },
     },
   },
@@ -890,7 +893,7 @@ require('lazy').setup({
     main = 'nvim-treesitter.configs', -- Sets main module to use for opts
     -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
     opts = {
-      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' },
+      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc', 'typescript', 'javascript', 'tsx', 'json' },
       -- Autoinstall languages that are not installed
       auto_install = true,
       highlight = {
