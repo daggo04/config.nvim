@@ -5,10 +5,10 @@ return {
     config = function()
       local lint = require 'lint'
 
-      -- Initial configuration - will be dynamically updated by venv-selector
+      -- Initial configuration - Python linting handled by python-env plugin
       lint.linters_by_ft = {
         markdown = { 'markdownlint' },
-        python = {}, -- Updated dynamically by the venv-select plugin in venv-select.lua
+        python = {}, -- Updated dynamically by the python-env plugin
       }
 
       -- Create autocommand for linting
@@ -18,13 +18,6 @@ return {
         callback = function()
           -- Only run the linter in buffers that you can modify
           if vim.opt_local.modifiable:get() then
-            -- For Python files, check and configure mypy before linting
-            if vim.bo.filetype == 'python' and _G.venv_utils then
-              -- Reconfigure linting based on current environment
-              _G.venv_utils.configure_python_linting()
-            end
-
-            -- Run linting with the configured settings
             lint.try_lint()
           end
         end,
