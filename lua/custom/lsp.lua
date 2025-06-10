@@ -1,4 +1,4 @@
 -- Basic LSP setup for Python
-require('lspconfig').pyright.setup {}
+-- Pyright is now handled by the python-env plugin
 
 return {}
