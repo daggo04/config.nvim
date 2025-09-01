@@ -4,10 +4,12 @@ return {
     'nvim-neotest/neotest',
     dependencies = {
       'nvim-lua/plenary.nvim',
-      'antoinemadec/FixCursorHold.nvim',
+      -- 'antoinemadec/FixCursorHold.nvim',
       'nvim-treesitter/nvim-treesitter',
       'nvim-neotest/nvim-nio',
       'nvim-neotest/neotest-python', -- Python test adapter
+      --  'nsidorenco/neotest-vstest',
+      'Issafalcon/neotest-dotnet',
     },
     config = function()
       -- Get neotest namespace (api call creates or returns namespace)
@@ -34,20 +36,32 @@ return {
             args = { '--verbose' },
             runner = 'pytest',
           },
+          require 'neotest-dotnet' {
+            discovery_root = 'project', -- <- important for big repos
+            dotnet_additional_args = { '--nologo' },
+          },
         },
         status = {
           virtual_text = true,
           signs = true,
+          enabled = true,
         },
         output = {
           enabled = true,
-          open_on_run = true,
+          open_on_run = false,
         },
         floating = {
           border = 'rounded',
           max_height = 0.9,
           max_width = 0.9,
           options = {},
+        },
+        log_level = vim.log.levels.DEBUG,
+        strategies = {
+          integrated = {
+            width = 120,
+            height = 40,
+          },
         },
       }
 

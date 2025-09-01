@@ -1,11 +1,54 @@
--- Adds git related signs to the gutter, as well as utilities for managing changes
--- NOTE: gitsigns is already included in init.lua but contains only the base
--- config. This will add also the recommended keymaps.
-
+-- Git signs in the gutter and inline blame
 return {
-  {
-    'lewis6991/gitsigns.nvim',
-    opts = {
+  'lewis6991/gitsigns.nvim',
+  event = { 'BufReadPre', 'BufNewFile' },
+  config = function()
+    -- Get colors from the current theme
+    local function get_hl_color(hl_group, attr)
+      local hl = vim.api.nvim_get_hl(0, { name = hl_group })
+      return hl[attr] and string.format('#%06x', hl[attr]) or nil
+    end
+
+    -- Use an autocmd to set colors after colorscheme is loaded
+    vim.api.nvim_create_autocmd('ColorScheme', {
+      callback = function()
+        -- Get theme colors - fallback to defaults if not available
+        local add_color = get_hl_color('DiffAdd', 'fg') or get_hl_color('String', 'fg') or '#a6e3a1'
+        local change_color = get_hl_color('DiffChange', 'fg') or get_hl_color('Function', 'fg') or '#f9e2af'
+        local delete_color = get_hl_color('DiffDelete', 'fg') or get_hl_color('Error', 'fg') or '#f38ba8'
+
+        -- Apply theme colors to GitSigns
+        vim.api.nvim_set_hl(0, 'GitSignsAdd', { fg = add_color })
+        vim.api.nvim_set_hl(0, 'GitSignsChange', { fg = add_color })
+        vim.api.nvim_set_hl(0, 'GitSignsDelete', { fg = delete_color })
+        vim.api.nvim_set_hl(0, 'GitSignsChangedelete', { fg = add_color })
+        vim.api.nvim_set_hl(0, 'GitSignsTopdelete', { fg = delete_color })
+      end,
+    })
+
+    -- Set initial colors
+    vim.schedule(function()
+      vim.cmd 'doautocmd ColorScheme'
+    end)
+
+    require('gitsigns').setup {
+      signs = {
+        add = { text = '┃' },
+        change = { text = '┆' },
+        delete = { text = '_' },
+        topdelete = { text = '‾' },
+        changedelete = { text = '~' },
+        untracked = { text = '┆' },
+      },
+      signs_staged = {
+        add = { text = '┃' },
+        change = { text = '┆' },
+        delete = { text = '_' },
+        topdelete = { text = '‾' },
+        changedelete = { text = '~' },
+        untracked = { text = '?' },
+      },
+
       on_attach = function(bufnr)
         local gitsigns = require 'gitsigns'
 
@@ -56,6 +99,6 @@ return {
         map('n', '<leader>tb', gitsigns.toggle_current_line_blame, { desc = '[T]oggle git show [b]lame line' })
         map('n', '<leader>tD', gitsigns.preview_hunk_inline, { desc = '[T]oggle git show [D]eleted' })
       end,
-    },
-  },
+    }
+  end,
 }
